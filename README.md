@@ -52,6 +52,14 @@ app at runtime.
 
 ## Deployment notes
 
+### Replit
+Playwright's bundled Chromium is missing system libraries on Replit (Nix), so
+the repo ships a `replit.nix` that installs `pkgs.chromium` (which bundles its
+own libraries). The app auto-detects a system Chromium on `PATH` and uses it.
+After pulling, let Replit rebuild the environment when it prompts, then
+`npm start`. No `CHROMIUM_PATH` needed; set it only to override.
+
+
 - Needs Node 20+ and a Chromium that Playwright can launch
   (`npx playwright install chromium` on a fresh host).
 - The Ignite session lives in server memory per app-session; restarting the

@@ -35,6 +35,9 @@ npm start                # http://localhost:3000
 | `PORT`              | Default `3000`.                                   |
 | `HEADLESS`          | `true` (default) or `false` to watch the browser. |
 | `CHROMIUM_PATH`     | Optional path to Chromium if autodetect fails.    |
+| `ANTHROPIC_API_KEY` | Optional. Enables the AI chat panel. Get it at console.anthropic.com. |
+| `WATCHFIRE_EMAIL`   | Optional. Ignite login email for one-click / unattended connect. |
+| `WATCHFIRE_PASSWORD`| Optional. Ignite login password. |
 
 **Set `APP_PASSWORD` (and `SESSION_SECRET`) as real secrets** — in your host's
 environment/secret settings for production, or in a local `.env` (git-ignored)
@@ -59,6 +62,7 @@ app at runtime.
 - ✅ App login gate (single approved user)
 - ✅ Ignite login flow (email-first GWT form) with MFA / error detection
 - ✅ Domain switch, Network view, screen snapshot
+- ✅ **AI chat** — plain-English commands over the session (needs `ANTHROPIC_API_KEY`); Claude reads the Network screenshot to answer status questions
 - 🔜 Network status **parsing** (per-sign online/offline) is captured as
   text + screenshot for now; the row parser is finalized against a live
   session. Downstream: feed status into `ninja-live-status`.

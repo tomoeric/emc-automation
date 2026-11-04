@@ -1,0 +1,36 @@
+name: Watchfire
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task to run'
+        type: choice
+        options: [inspect]
+        default: inspect
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - name: Install Chromium (with system deps)
+        run: npx playwright install --with-deps chromium
+      - name: Run task
+        env:
+          WATCHFIRE_COOKIE: ${{ secrets.WATCHFIRE_COOKIE }}
+          WATCHFIRE_EMAIL: ${{ secrets.WATCHFIRE_EMAIL }}
+          WATCHFIRE_PASSWORD: ${{ secrets.WATCHFIRE_PASSWORD }}
+          TASK: ${{ inputs.task }}
+          HEADLESS: 'true'
+        run: npx tsx scripts/watchfire-cli.ts
+      - name: Upload screenshots + HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: watchfire-out
+          path: out/

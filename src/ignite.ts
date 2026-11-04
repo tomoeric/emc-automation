@@ -48,6 +48,7 @@ export class IgniteSession {
   private ctx?: BrowserContext;
   private page?: Page;
   private closed = false;
+  private xhrLog: string[] = [];
 
   get ready(): boolean {
     return !!this.page && !this.closed;
@@ -64,6 +65,11 @@ export class IgniteSession {
       viewport: { width: 1400, height: 950 },
     });
     this.page = await this.ctx.newPage();
+    // Record the UI's own XHR/fetch traffic (to learn request shapes).
+    this.page.on('request', (r) => {
+      const t = r.resourceType();
+      if (t === 'xhr' || t === 'fetch') this.xhrLog.push(`${r.method()} ${r.url()}`);
+    });
     this.closed = false;
     return this.page;
   }
@@ -86,6 +92,53 @@ export class IgniteSession {
       if (nav > 0) return true;
     }
     return false;
+  }
+
+  /** Recorded XHR/fetch requests the Ignite UI fired (deduped on read). */
+  getXhr(): string[] {
+    return Array.from(new Set(this.xhrLog));
+  }
+
+  /**
+   * Authenticate by injecting a session cookie captured from a logged-in
+   * browser (copy the full Cookie request header from the Network tab — it
+   * includes the httpOnly session cookie that document.cookie can't see).
+   * This skips the GWT login flow entirely.
+   */
+  async loginWithCookies(cookieHeader: string): Promise<LoginResult> {
+    let page: Page;
+    try {
+      page = await this.ensureStarted();
+      const cookies = cookieHeader
+        .split(';')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((pair) => {
+          const i = pair.indexOf('=');
+          return {
+            name: pair.slice(0, i).trim(),
+            value: pair.slice(i + 1).trim(),
+            domain: '.watchfireignite.com',
+            path: '/',
+            secure: true,
+            sameSite: 'None' as const,
+          };
+        });
+      await this.ctx!.addCookies(cookies);
+      await page.goto(config.ignite.managerUrl, { waitUntil: 'networkidle', timeout: 60000 });
+      await page.waitForTimeout(3000);
+      if (await this.atManager()) return { ok: true };
+      return {
+        ok: false,
+        reason:
+          'Cookie did not establish a session (bounced to login). The cookie is ' +
+          'likely expired or incomplete — copy the FULL Cookie request header ' +
+          'from the Network tab while logged in (it includes the httpOnly cookie).',
+        screenshot: await this.shot(),
+      };
+    } catch (e: any) {
+      return { ok: false, reason: `Cookie login error: ${e?.message ?? e}`, screenshot: await this.shot() };
+    }
   }
 
   async login(email: string, password: string): Promise<LoginResult> {
@@ -308,6 +361,36 @@ export class IgniteSession {
       text: (await this.bodyText()).slice(0, 4000),
       screenshot: await this.shot(),
     };
+  }
+
+  /** Full page HTML (for structure inspection). */
+  async html(): Promise<string> {
+    if (!this.page) return '';
+    return (await this.page.content().catch(() => '')) || '';
+  }
+
+  /** Save a full-page screenshot to a file (for CI artifacts). */
+  async saveScreenshot(path: string): Promise<void> {
+    if (!this.page) return;
+    await this.page.screenshot({ path, fullPage: true }).catch(() => {});
+  }
+
+  /** List visible clickable elements with their text (for mapping the UI). */
+  async clickable(): Promise<Array<{ tag: string; text: string }>> {
+    const page = this.page;
+    if (!page) return [];
+    return page
+      .$$eval(
+        'a, button, [role="button"], .gwt-Button, [onclick], li, td',
+        (els) =>
+          els
+            .map((e) => ({
+              tag: (e as HTMLElement).tagName.toLowerCase(),
+              text: ((e as HTMLElement).innerText || (e as HTMLElement).textContent || '').trim(),
+            }))
+            .filter((x) => x.text.length > 0 && x.text.length <= 60),
+      )
+      .catch(() => []);
   }
 
   async close(): Promise<void> {

@@ -6,3 +6,4 @@ dist/
 /screenshots/
 /tmp/
 .DS_Store
+/out/

@@ -54,6 +54,7 @@
       <label>Ignite password</label>
       <input id="wfPass" type="password" autocomplete="off">
       <button class="act" id="connect">Connect</button>
+      <button class="act ghost hidden" id="connectEnv" style="margin-left:8px">Connect with saved credentials</button>
       <div class="status" id="connStatus"></div>
     </div>
 
@@ -108,22 +109,27 @@
 
   $('logout').onclick = async () => { await api('/api/logout'); location.href='/'; };
 
-  $('connect').onclick = async () => {
-    $('connect').disabled = true;
+  // Reveal the saved-credentials button if secrets are configured.
+  fetch('/api/me').then(r=>r.json()).then(j=>{ if(j.wfEnvAvailable) show($('connectEnv'), true); });
+
+  async function connectVia(path, body){
+    $('connect').disabled = true; $('connectEnv').disabled = true;
     setStatus($('connStatus'), 'Connecting to Ignite…');
-    const res = await api('/api/ignite/login', { email:$('wfEmail').value, password:$('wfPass').value });
-    $('connect').disabled = false;
+    const res = await api(path, body);
+    $('connect').disabled = false; $('connectEnv').disabled = false;
     if (res.ok){
       setStatus($('connStatus'), 'Connected to Ignite.', true);
-      show($('actions'), true);
-      show($('chatCard'), true);
+      show($('actions'), true); show($('chatCard'), true);
       fetch('/api/me').then(r=>r.json()).then(j=>{ if(!j.aiEnabled) $('aiHint').textContent='AI chat needs ANTHROPIC_API_KEY set as a secret. The action buttons above still work without it.'; });
       $('wfPass').value = '';
     } else {
       setStatus($('connStatus'), (res.needsCode?'MFA: ':'') + (res.reason||'Login failed.'), false);
       if (res.screenshot){ $('shot').src = res.screenshot; show($('shot'), true); show($('actions'), true); }
     }
-  };
+  }
+  $('connectEnv').onclick = () => connectVia('/api/ignite/connect-env');
+
+  $('connect').onclick = () => connectVia('/api/ignite/login', { email:$('wfEmail').value, password:$('wfPass').value });
 
   $('loadDomains').onclick = async () => {
     const res = await api('/api/ignite/domains');

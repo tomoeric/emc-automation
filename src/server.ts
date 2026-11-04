@@ -83,7 +83,12 @@ app.post('/api/logout', async (req, res) => {
 });
 
 app.get('/api/me', (req, res) => {
-  res.json({ ok: true, user: req.session.user ?? null, aiEnabled: !!config.anthropicKey });
+  res.json({
+    ok: true,
+    user: req.session.user ?? null,
+    aiEnabled: !!config.anthropicKey,
+    wfEnvAvailable: !!(config.watchfireEmail && config.watchfirePassword),
+  });
 });
 
 // ── Ignite actions (all require app auth) ────────────────────────────
@@ -95,6 +100,15 @@ app.post('/api/ignite/login', requireAuth, async (req, res) => {
   }
   const s = getIgnite(req);
   const result = await s.login(email, password);
+  res.json(result);
+});
+
+app.post('/api/ignite/connect-env', requireAuth, async (req, res) => {
+  if (!config.watchfireEmail || !config.watchfirePassword) {
+    return res.status(400).json({ ok: false, reason: 'WATCHFIRE_EMAIL / WATCHFIRE_PASSWORD are not set as secrets.' });
+  }
+  const s = getIgnite(req);
+  const result = await s.login(config.watchfireEmail, config.watchfirePassword);
   res.json(result);
 });
 

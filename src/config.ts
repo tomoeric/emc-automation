@@ -26,6 +26,11 @@ export const config = {
   // Optional — only needed for the AI chat layer.
   anthropicKey: process.env.ANTHROPIC_API_KEY || undefined,
 
+  // Optional — Watchfire Ignite credentials for one-click / unattended connect.
+  // If unset, credentials are entered in the app at runtime instead.
+  watchfireEmail: process.env.WATCHFIRE_EMAIL || undefined,
+  watchfirePassword: process.env.WATCHFIRE_PASSWORD || undefined,
+
   // Watchfire Ignite entry points (observed, stable).
   ignite: {
     loginUrl:

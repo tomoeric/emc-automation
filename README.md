@@ -36,6 +36,8 @@ npm start                # http://localhost:3000
 | `HEADLESS`          | `true` (default) or `false` to watch the browser. |
 | `CHROMIUM_PATH`     | Optional path to Chromium if autodetect fails.    |
 | `ANTHROPIC_API_KEY` | Optional. Enables the AI chat panel. Get it at console.anthropic.com. |
+| `WATCHFIRE_EMAIL`   | Optional. Ignite login email for one-click / unattended connect. |
+| `WATCHFIRE_PASSWORD`| Optional. Ignite login password. |
 
 **Set `APP_PASSWORD` (and `SESSION_SECRET`) as real secrets** — in your host's
 environment/secret settings for production, or in a local `.env` (git-ignored)

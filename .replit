@@ -1,0 +1,21 @@
+# Tells Replit how to run and deploy the app.
+run = "npm start"
+entrypoint = "src/server.ts"
+
+[nix]
+channel = "stable-24_05"
+
+[env]
+PORT = "3000"
+
+# Workspace "Run" button + preview
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+# Publish / Deploy. Reserved VM = always-on, which this app needs
+# (it holds a live browser session in memory; Autoscale would kill it).
+[deployment]
+deploymentTarget = "vm"
+build = ["npm", "install"]
+run = ["npm", "start"]

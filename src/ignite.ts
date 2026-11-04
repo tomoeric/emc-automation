@@ -92,6 +92,9 @@ export class IgniteSession {
     let page: Page;
     try {
       page = await this.ensureStarted();
+      // Already connected? Don't re-run the login (avoids a spurious
+      // "password field never appeared" when Connect is clicked twice).
+      if (await this.atManager()) return { ok: true };
       await page.goto(config.ignite.loginUrl, {
         waitUntil: 'domcontentloaded',
         timeout: 60000,

@@ -170,7 +170,7 @@ app.get('/', (req, res) => {
 });
 app.use(express.static(publicDir));
 
-app.listen(config.port, () => {
+app.listen(config.port, '0.0.0.0', () => {
   console.log(`EMC automation running on http://localhost:${config.port}`);
   console.log(`Approved app login: ${config.allowedEmail}`);
 });

@@ -185,10 +185,42 @@ export class IgniteSession {
     return (await this.page.innerText('body').catch(() => '')) || '';
   }
 
+  /**
+   * Open the top-right domain switcher so all domains (not just the current
+   * one) become visible. Clicks the smallest element in the header that shows
+   * the current domain name.
+   */
+  private async openDomainSwitcher(): Promise<void> {
+    const page = this.page!;
+    const cands = page.locator(
+      ':is(a,span,div,button,td):has-text("Mammoth Holdings"), ' +
+      ':is(a,span,div,button,td):has-text("Mojo Car Wash"), ' +
+      ':is(a,span,div,button,td):has-text("Silverstar Car Wash")',
+    );
+    const n = Math.min(await cands.count(), 30);
+    let best: number = -1;
+    let bestArea = Infinity;
+    for (let i = 0; i < n; i++) {
+      const box = await cands.nth(i).boundingBox().catch(() => null);
+      if (!box) continue;
+      if (box.y > 220) continue; // header region only
+      const area = box.width * box.height;
+      if (area > 0 && area < bestArea) {
+        bestArea = area;
+        best = i;
+      }
+    }
+    if (best >= 0) {
+      await cands.nth(best).click({ timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(1500);
+    }
+  }
+
   /** Read the list of domains available in the account switcher. */
   async listDomains(): Promise<string[]> {
     const page = this.page;
     if (!page) return [];
+    await this.openDomainSwitcher();
     // The domain panel lists "Switch to Domain" with the available domains.
     const items = await page
       .locator('text=/Mammoth Holdings|Mojo Car Wash|Silverstar Car Wash/')
@@ -202,7 +234,8 @@ export class IgniteSession {
     const page = this.page;
     if (!page) return { ok: false, reason: 'Not logged in', url: '' };
     try {
-      const item = page.locator(`text="${name}"`).first();
+      await this.openDomainSwitcher();
+      const item = page.locator(`text="${name}"`).last();
       await item.waitFor({ state: 'visible', timeout: 10000 });
       await item.click();
       await page.waitForTimeout(2500);

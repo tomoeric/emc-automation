@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { config } from './config.js';
 import { IgniteSession } from './ignite.js';
+import { runAgent } from './agent.js';
+import type Anthropic from '@anthropic-ai/sdk';
 
 declare module 'express-session' {
   interface SessionData {
@@ -17,6 +19,8 @@ const publicDir = path.join(__dirname, '..', 'public');
 
 // One live Ignite browser session per app session, kept in memory.
 const igniteSessions = new Map<string, IgniteSession>();
+// AI chat history per app session (in memory).
+const chatHistories = new Map<string, Anthropic.MessageParam[]>();
 
 function safeEqual(a: string, b: string): boolean {
   const ab = Buffer.from(a);
@@ -74,11 +78,12 @@ app.post('/api/logout', async (req, res) => {
     await s.close();
     igniteSessions.delete(req.sessionID);
   }
+  chatHistories.delete(req.sessionID);
   req.session.destroy(() => res.json({ ok: true }));
 });
 
 app.get('/api/me', (req, res) => {
-  res.json({ ok: true, user: req.session.user ?? null });
+  res.json({ ok: true, user: req.session.user ?? null, aiEnabled: !!config.anthropicKey });
 });
 
 // ── Ignite actions (all require app auth) ────────────────────────────
@@ -125,7 +130,24 @@ app.post('/api/ignite/close', requireAuth, async (req, res) => {
     await s.close();
     igniteSessions.delete(req.sessionID);
   }
+  chatHistories.delete(req.sessionID);
   res.json({ ok: true });
+});
+
+// ── AI chat: natural-language commands over the Ignite session ─────────
+app.post('/api/ignite/chat', requireAuth, async (req, res) => {
+  const s = igniteSessions.get(req.sessionID);
+  if (!s || !s.ready) return res.status(409).json({ ok: false, reason: 'Connect to Watchfire first.' });
+  const message = String(req.body?.message ?? '').trim();
+  if (!message) return res.status(400).json({ ok: false, reason: 'Message required.' });
+  try {
+    const hist = chatHistories.get(req.sessionID) ?? [];
+    const { reply, history } = await runAgent(s, message, hist);
+    chatHistories.set(req.sessionID, history);
+    res.json({ ok: true, reply });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, reason: e?.message ?? String(e) });
+  }
 });
 
 // ── Static frontend ──────────────────────────────────────────────────

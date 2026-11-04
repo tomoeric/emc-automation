@@ -23,6 +23,9 @@ export const config = {
   headless: (process.env.HEADLESS ?? 'true').toLowerCase() !== 'false',
   chromiumPath: process.env.CHROMIUM_PATH || undefined,
 
+  // Optional — only needed for the AI chat layer.
+  anthropicKey: process.env.ANTHROPIC_API_KEY || undefined,
+
   // Watchfire Ignite entry points (observed, stable).
   ignite: {
     loginUrl:

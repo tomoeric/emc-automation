@@ -75,6 +75,19 @@
       <img class="shot hidden" id="shot">
       <pre class="text hidden" id="outText"></pre>
     </div>
+
+    <div class="card hidden" id="chatCard">
+      <h2>3 · Ask (AI)</h2>
+      <p id="aiHint" style="font-size:13px;color:#6b7280;margin:0 0 10px">
+        Type what you need — e.g. "which signs are offline?" or
+        "switch to Mojo Car Wash and show network status."
+      </p>
+      <div id="chatLog" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+      <div class="row">
+        <input id="chatInput" type="text" placeholder="Ask the assistant…" style="flex:3">
+        <button class="act" id="chatSend" style="flex:1">Send</button>
+      </div>
+    </div>
   </main>
 <script>
   const $ = (id) => document.getElementById(id);
@@ -103,6 +116,8 @@
     if (res.ok){
       setStatus($('connStatus'), 'Connected to Ignite.', true);
       show($('actions'), true);
+      show($('chatCard'), true);
+      fetch('/api/me').then(r=>r.json()).then(j=>{ if(!j.aiEnabled) $('aiHint').textContent='AI chat needs ANTHROPIC_API_KEY set as a secret. The action buttons above still work without it.'; });
       $('wfPass').value = '';
     } else {
       setStatus($('connStatus'), (res.needsCode?'MFA: ':'') + (res.reason||'Login failed.'), false);
@@ -121,6 +136,25 @@
   $('switchDomain').onclick = async () => render(await api('/api/ignite/switch', { name:$('domain').value }));
   $('network').onclick = async () => render(await api('/api/ignite/network'));
   $('snapshot').onclick = async () => render(await api('/api/ignite/snapshot'));
+
+  function bubble(role, text){
+    const d=document.createElement('div');
+    const me = role==='you';
+    d.style.cssText='max-width:85%;padding:8px 12px;border-radius:12px;font-size:14px;white-space:pre-wrap;'+
+      (me?'align-self:flex-end;background:#9d1a2d;color:#fff':'align-self:flex-start;background:#e5e7eb;color:#111');
+    d.textContent=text; $('chatLog').appendChild(d); $('chatLog').scrollTop=1e9;
+    return d;
+  }
+  async function sendChat(){
+    const t=$('chatInput').value.trim(); if(!t) return;
+    $('chatInput').value=''; bubble('you', t);
+    const thinking=bubble('ai','…'); $('chatSend').disabled=true;
+    const res=await api('/api/ignite/chat',{message:t});
+    thinking.textContent = res.ok ? res.reply : ('Error: '+(res.reason||'failed'));
+    $('chatSend').disabled=false; $('chatInput').focus();
+  }
+  $('chatSend').onclick=sendChat;
+  $('chatInput').addEventListener('keydown',e=>{ if(e.key==='Enter') sendChat(); });
 </script>
 </body>
 </html>

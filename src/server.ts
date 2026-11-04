@@ -176,6 +176,11 @@ app.get('/', (req, res) => {
 });
 app.use(express.static(publicDir));
 
+if (!config.appPassword) {
+  console.error('APP_PASSWORD is not set — set it (and SESSION_SECRET) before starting the server.');
+  process.exit(1);
+}
+
 app.listen(config.port, '0.0.0.0', () => {
   console.log(`EMC automation running on http://localhost:${config.port}`);
   console.log(`Approved app login: ${config.allowedEmail}`);

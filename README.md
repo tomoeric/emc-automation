@@ -52,6 +52,20 @@ app at runtime.
 
 ## Deployment notes
 
+### GitHub Actions (recommended for the browser automation)
+Playwright runs cleanly on GitHub's Ubuntu runners. The `Watchfire` workflow
+(`.github/workflows/watchfire.yml`, manual trigger) installs Chromium with
+`--with-deps`, logs into Ignite, and runs a task via `scripts/watchfire-cli.ts`.
+
+**Auth is by session cookie** (robust — skips the GWT login/MFA). Copy the full
+`Cookie` request header from the Network tab while logged into Ignite and store
+it as the repo secret `WATCHFIRE_COOKIE` (Settings -> Secrets -> Actions).
+Email/password (`WATCHFIRE_EMAIL`/`WATCHFIRE_PASSWORD`) are a fallback.
+
+The first task, `inspect`, logs in and dumps the playlist screens (screenshots
+as an artifact, DOM structure + the UI's own XHR traffic in the run log) so the
+add-screen / dedupe logic can be built against the real layout.
+
 ### Replit
 Playwright's bundled Chromium is missing system libraries on Replit (Nix), so
 the repo ships a `replit.nix` that installs `pkgs.chromium` (which bundles its

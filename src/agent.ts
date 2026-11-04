@@ -34,6 +34,24 @@ const tools: Anthropic.Tool[] = [
     description: 'Capture the current Ignite screen (text + screenshot) to see where you are.',
     input_schema: { type: 'object', properties: {}, additionalProperties: false },
   },
+  {
+    name: 'click',
+    description:
+      'Click a link, button, menu item, tab, or row by its visible text ' +
+      '(e.g. "Network", "View All", a sign name). Use this to navigate deeper. ' +
+      'Returns the resulting screen as a screenshot you should read.',
+    input_schema: {
+      type: 'object',
+      properties: { text: { type: 'string', description: 'Exact visible text to click' } },
+      required: ['text'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'read_screen',
+    description: 'Capture the current screen (text + screenshot) to see where you are and what to click next.',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
+  },
 ];
 
 const SYSTEM =
@@ -43,7 +61,14 @@ const SYSTEM =
   'When asked about sign or display status, call network_status and READ THE ' +
   'SCREENSHOT to report which signs are online or offline. Be concise and ' +
   'factual. If a tool returns an error, say what happened. Never invent sign ' +
-  'names, counts, or statuses you did not actually see on screen.';
+  'names, counts, or statuses you did not actually see on screen. ' +
+  'To find sign / display status, open the Network section, then click into ' +
+  'the list of individual signs (for example "View All") and READ THE ' +
+  'SCREENSHOT for each sign\'s name and online/offline/connection status. ' +
+  'Navigate with the click tool using the visible text of links, tabs, or ' +
+  'rows, and use read_screen to see where you are before deciding what to ' +
+  'click next. To change domain, click the current domain name to open the ' +
+  'switcher, then click the target domain.';
 
 async function runTool(
   session: IgniteSession,
@@ -57,7 +82,8 @@ async function runTool(
   let res;
   if (name === 'switch_domain') res = await session.switchDomain(String(input?.name ?? ''));
   else if (name === 'network_status') res = await session.getNetworkStatus();
-  else if (name === 'snapshot_screen') res = await session.snapshot();
+  else if (name === 'snapshot_screen' || name === 'read_screen') res = await session.snapshot();
+  else if (name === 'click') res = await session.click(String(input?.text ?? ''));
   else return [{ type: 'text', text: `Unknown tool: ${name}` }];
 
   const blocks: any[] = [
@@ -81,7 +107,7 @@ export async function runAgent(
   const client = new Anthropic({ apiKey: config.anthropicKey });
   const messages: Anthropic.MessageParam[] = [...history, { role: 'user', content: userText }];
 
-  for (let step = 0; step < 8; step++) {
+  for (let step = 0; step < 14; step++) {
     const resp = await client.messages.create({
       model: MODEL,
       max_tokens: 4000,

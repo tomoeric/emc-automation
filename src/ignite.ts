@@ -232,6 +232,36 @@ export class IgniteSession {
     }
   }
 
+  /**
+   * Click a link, button, or menu item by its visible text, then return the
+   * resulting screen. Tolerant: tries link/button roles first, then any text.
+   */
+  async click(text: string): Promise<ActionResult> {
+    const page = this.page;
+    if (!page) return { ok: false, reason: 'Not logged in', url: '' };
+    try {
+      let target = page.getByRole('link', { name: text }).first();
+      if ((await target.count()) === 0) target = page.getByRole('button', { name: text }).first();
+      if ((await target.count()) === 0) target = page.getByText(text, { exact: false }).first();
+      await target.waitFor({ state: 'visible', timeout: 8000 });
+      await target.click({ timeout: 8000 });
+      await page.waitForTimeout(2500);
+      return {
+        ok: true,
+        url: page.url(),
+        text: (await this.bodyText()).slice(0, 3000),
+        screenshot: await this.shot(),
+      };
+    } catch (e: any) {
+      return {
+        ok: false,
+        reason: `Could not click "${text}": ${e?.message ?? e}`,
+        url: page.url(),
+        screenshot: await this.shot(),
+      };
+    }
+  }
+
   /** Generic: capture the current screen (text + screenshot) for inspection. */
   async snapshot(): Promise<ActionResult> {
     const page = this.page;

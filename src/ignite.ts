@@ -1,5 +1,27 @@
+import { execSync } from 'node:child_process';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { config } from './config.js';
+
+/**
+ * Resolve a Chromium binary. Prefer an explicit CHROMIUM_PATH, then a system
+ * Chromium on PATH (e.g. the Nix-provided one on Replit, which ships its own
+ * shared libraries). Returns undefined to fall back to Playwright's bundled
+ * browser.
+ */
+function resolveChromium(): string | undefined {
+  if (config.chromiumPath) return config.chromiumPath;
+  for (const cmd of ['chromium', 'chromium-browser', 'google-chrome-stable', 'google-chrome']) {
+    try {
+      const out = execSync(`command -v ${cmd}`, { stdio: ['ignore', 'pipe', 'ignore'] })
+        .toString()
+        .trim();
+      if (out) return out;
+    } catch {
+      /* not found, try next */
+    }
+  }
+  return undefined;
+}
 
 export type LoginResult =
   | { ok: true }
@@ -35,8 +57,8 @@ export class IgniteSession {
     if (this.page && !this.closed) return this.page;
     this.browser = await chromium.launch({
       headless: config.headless,
-      executablePath: config.chromiumPath,
-      args: ['--no-sandbox'],
+      executablePath: resolveChromium(),
+      args: ['--no-sandbox', '--disable-dev-shm-usage'],
     });
     this.ctx = await this.browser.newContext({
       viewport: { width: 1400, height: 950 },
@@ -67,8 +89,9 @@ export class IgniteSession {
   }
 
   async login(email: string, password: string): Promise<LoginResult> {
-    const page = await this.ensureStarted();
+    let page: Page;
     try {
+      page = await this.ensureStarted();
       await page.goto(config.ignite.loginUrl, {
         waitUntil: 'domcontentloaded',
         timeout: 60000,

@@ -99,8 +99,11 @@ app.post('/api/ignite/login', requireAuth, async (req, res) => {
     return res.status(400).json({ ok: false, reason: 'Watchfire email and password are required.' });
   }
   const s = getIgnite(req);
-  const result = await s.login(email, password);
-  res.json(result);
+  try {
+    res.json(await s.login(email, password));
+  } catch (e: any) {
+    res.status(500).json({ ok: false, reason: `Ignite login failed: ${e?.message ?? e}` });
+  }
 });
 
 app.post('/api/ignite/connect-env', requireAuth, async (req, res) => {
@@ -108,8 +111,11 @@ app.post('/api/ignite/connect-env', requireAuth, async (req, res) => {
     return res.status(400).json({ ok: false, reason: 'WATCHFIRE_EMAIL / WATCHFIRE_PASSWORD are not set as secrets.' });
   }
   const s = getIgnite(req);
-  const result = await s.login(config.watchfireEmail, config.watchfirePassword);
-  res.json(result);
+  try {
+    res.json(await s.login(config.watchfireEmail, config.watchfirePassword));
+  } catch (e: any) {
+    res.status(500).json({ ok: false, reason: `Ignite login failed: ${e?.message ?? e}` });
+  }
 });
 
 app.post('/api/ignite/domains', requireAuth, async (req, res) => {

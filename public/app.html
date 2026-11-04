@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EMC Automation</title>
+<style>
+  :root { color-scheme: light dark; --b:#9d1a2d; }
+  body { margin:0; font:15px/1.5 system-ui,sans-serif; background:#f3f4f6; color:#111; }
+  @media (prefers-color-scheme: dark){ body{ background:#0f1115; color:#e8e8e8; } }
+  header { display:flex; align-items:center; justify-content:space-between;
+    padding:12px 20px; background:#e8b500; color:#1a1a1a; }
+  header b { font-size:16px; }
+  header button { border:0; background:rgba(0,0,0,.15); color:#1a1a1a;
+    padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:600; }
+  main { max-width:900px; margin:24px auto; padding:0 16px; }
+  .card { background:#fff; border:1px solid #e2e2e2; border-radius:12px;
+    padding:20px; margin-bottom:18px; }
+  @media (prefers-color-scheme: dark){ .card{ background:#1a1d24; border-color:#2a2f3a; } }
+  h2 { font-size:15px; margin:0 0 12px; }
+  label { display:block; font-size:12px; font-weight:600; margin:10px 0 4px; }
+  input, select { width:100%; box-sizing:border-box; padding:8px 10px; border-radius:8px;
+    border:1px solid #cbd5e1; background:#fff; color:inherit; font-size:14px; }
+  @media (prefers-color-scheme: dark){ input,select{ background:#11141a; border-color:#374151; } }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > * { flex:1; min-width:140px; }
+  button.act { margin-top:14px; padding:9px 14px; border:0; border-radius:8px;
+    background:var(--b); color:#fff; font-weight:600; cursor:pointer; }
+  button.act:disabled { opacity:.5; cursor:default; }
+  button.ghost { background:#374151; }
+  .status { font-size:13px; margin-top:10px; white-space:pre-wrap; color:#374151; }
+  @media (prefers-color-scheme: dark){ .status{ color:#9ca3af; } }
+  .ok { color:#16a34a; } .bad { color:#dc2626; }
+  img.shot { width:100%; border:1px solid #d1d5db; border-radius:8px; margin-top:12px; }
+  pre.text { max-height:260px; overflow:auto; background:#0b0e13; color:#cbd5e1;
+    padding:12px; border-radius:8px; font-size:12px; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+  <header>
+    <b>EMC Automation — Watchfire Ignite</b>
+    <button id="logout">Sign out</button>
+  </header>
+  <main>
+    <div class="card">
+      <h2>1 · Connect to Watchfire Ignite</h2>
+      <p style="font-size:13px;color:#6b7280;margin:0 0 6px">
+        Your Ignite credentials are sent to the server, used only to drive the
+        browser session, and kept in memory — never saved to disk.
+      </p>
+      <label>Ignite email</label>
+      <input id="wfEmail" type="email" autocomplete="off">
+      <label>Ignite password</label>
+      <input id="wfPass" type="password" autocomplete="off">
+      <button class="act" id="connect">Connect</button>
+      <div class="status" id="connStatus"></div>
+    </div>
+
+    <div class="card hidden" id="actions">
+      <h2>2 · Actions</h2>
+      <div class="row">
+        <div>
+          <label>Domain</label>
+          <select id="domain"><option value="">(load domains)</option></select>
+        </div>
+      </div>
+      <div class="row">
+        <button class="act" id="loadDomains">Load domains</button>
+        <button class="act" id="switchDomain">Switch domain</button>
+        <button class="act" id="network">Network status</button>
+        <button class="act ghost" id="snapshot">Snapshot screen</button>
+      </div>
+      <div class="status" id="actStatus"></div>
+      <img class="shot hidden" id="shot">
+      <pre class="text hidden" id="outText"></pre>
+    </div>
+  </main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const api = (path, body) => fetch(path, {
+    method:'POST', headers:{'content-type':'application/json'},
+    body: JSON.stringify(body || {})
+  }).then(r => r.json());
+
+  function show(el, on){ el.classList.toggle('hidden', !on); }
+  function setStatus(el, msg, good){
+    el.textContent = msg; el.className = 'status ' + (good===true?'ok':good===false?'bad':'');
+  }
+  function render(res){
+    setStatus($('actStatus'), (res.ok?'OK · ':'Error · ') + (res.reason||res.url||''), res.ok);
+    if (res.screenshot){ $('shot').src = res.screenshot; show($('shot'), true); } else show($('shot'), false);
+    if (res.text){ $('outText').textContent = res.text; show($('outText'), true); } else show($('outText'), false);
+  }
+
+  $('logout').onclick = async () => { await api('/api/logout'); location.href='/'; };
+
+  $('connect').onclick = async () => {
+    $('connect').disabled = true;
+    setStatus($('connStatus'), 'Connecting to Ignite…');
+    const res = await api('/api/ignite/login', { email:$('wfEmail').value, password:$('wfPass').value });
+    $('connect').disabled = false;
+    if (res.ok){
+      setStatus($('connStatus'), 'Connected to Ignite.', true);
+      show($('actions'), true);
+      $('wfPass').value = '';
+    } else {
+      setStatus($('connStatus'), (res.needsCode?'MFA: ':'') + (res.reason||'Login failed.'), false);
+      if (res.screenshot){ $('shot').src = res.screenshot; show($('shot'), true); show($('actions'), true); }
+    }
+  };
+
+  $('loadDomains').onclick = async () => {
+    const res = await api('/api/ignite/domains');
+    if (res.ok){
+      const sel = $('domain'); sel.innerHTML='';
+      (res.domains||[]).forEach(d => { const o=document.createElement('option'); o.value=o.textContent=d; sel.appendChild(o); });
+      setStatus($('actStatus'), 'Domains: ' + (res.domains||[]).join(', '), true);
+    } else render(res);
+  };
+  $('switchDomain').onclick = async () => render(await api('/api/ignite/switch', { name:$('domain').value }));
+  $('network').onclick = async () => render(await api('/api/ignite/network'));
+  $('snapshot').onclick = async () => render(await api('/api/ignite/snapshot'));
+</script>
+</body>
+</html>
